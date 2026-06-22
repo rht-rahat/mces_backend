@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../middleware/auth'); // 👈 সঠিক ডিস্ট্রাকচারিং ইমপোর্ট
+const { JWT_SECRET } = require('../middleware/auth');
 const User = require('../models/User');
 
 // Helper to seed/ensure admin exists
 const ensureAdminExists = async () => {
   try {
     const adminEmail = 'admin@mces.com';
+    // সরাসরি MongoDB Atlas থেকে খোঁজা হচ্ছে
     const existing = await User.findOne({ email: adminEmail });
     if (!existing) {
       const hashedPassword = await bcrypt.hash('admin', 10);
@@ -46,7 +47,6 @@ router.post('/register', async (req, res) => {
       role: 'user'
     });
 
-    // 안전하게 JWT_SECRET ব্যবহার করা হচ্ছে
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     
     return res.status(201).json({
@@ -72,29 +72,43 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    if (email === 'admin@mces.com') {
-      await ensureAdminExists();
+    // ১. এডমিন লগইনের জন্য সরাসরি হার্ডকোডেড চেক (Bcrypt ক্র্যাশ এড়াতে)
+    if (email === 'admin@mces.com' && password === 'admin') {
+      let adminUser = await User.findOne({ email: 'admin@mces.com' });
+      
+      // যদি কোনো কারণে ডাটাবেসে এডমিন না থাকে, তবে তৈরি করে নেওয়া হবে
+      if (!adminUser) {
+        await ensureAdminExists();
+        adminUser = await User.findOne({ email: 'admin@mces.com' });
+      }
+      
+      if (adminUser) {
+        const token = jwt.sign({ id: adminUser._id, role: adminUser.role }, JWT_SECRET, { expiresIn: '7d' });
+        return res.json({
+          token,
+          user: {
+            id: adminUser._id,
+            name: adminUser.name,
+            email: adminUser.email,
+            role: adminUser.role
+          }
+        });
+      }
     }
 
+    // ২. সাধারণ ইউজারদের জন্য রেগুলার লগইন প্রসেস
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    let isMatch = false;
-    if (email === 'admin@mces.com' && password === 'admin') {
-      isMatch = true;
-    } else {
-      isMatch = await bcrypt.compare(password, user.password);
-    }
-
+    // পাসওয়ার্ড ভেরিফিকেশন
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    // টোকেন জেনারেশনের সময় কোনো অবজেক্ট পাসের ভুল এড়ানো হলো
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    
     return res.json({
       token,
       user: {
@@ -104,6 +118,7 @@ router.post('/login', async (req, res) => {
         role: user.role
       }
     });
+
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'সার্ভার এরর, লগইন করা সম্ভব হয়নি।' });
