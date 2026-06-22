@@ -2,17 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { auth, admin } = require('../middleware/auth');
 const { uploadSingle, handleUpload } = require('../middleware/upload');
-const Review = require('../models/Review');
-const dbHelper = require('../models/modelHelper');
+const Review = require('../models/Review'); // সরাসরি Mongoose Model ব্যবহার হবে
 
 // GET /api/reviews - Fetch all client reviews
 router.get('/', async (req, res) => {
   try {
-    const list = await dbHelper.find(Review, 'reviews', {}, { createdAt: -1 });
+    // সরাসরি MongoDB Atlas থেকে সব রিভিউ লেটেস্ট অনুযায়ী সর্ট করে আনা হচ্ছে 🔍
+    const list = await Review.find({}).sort({ createdAt: -1 });
     res.json(list);
   } catch (error) {
     console.error('Fetch reviews error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'সার্ভার এরর, রিভিউ পাওয়া যায়নি।' });
   }
 });
 
@@ -26,7 +26,8 @@ router.post('/', auth, admin, uploadSingle, handleUpload, async (req, res) => {
   }
 
   try {
-    const review = await dbHelper.create(Review, 'reviews', {
+    // সরাসরি MongoDB Atlas-এ নতুন রিভিউ তৈরি করা হচ্ছে 🚀
+    const review = await Review.create({
       clientName,
       clientRole,
       reviewText,
@@ -36,7 +37,7 @@ router.post('/', auth, admin, uploadSingle, handleUpload, async (req, res) => {
     res.status(201).json(review);
   } catch (error) {
     console.error('Create review error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'সার্ভার এরর, রিভিউ তৈরি করা যায়নি।' });
   }
 });
 
@@ -52,28 +53,35 @@ router.put('/:id', auth, admin, uploadSingle, handleUpload, async (req, res) => 
   if (req.fileUrl) updateFields.imageUrl = req.fileUrl;
 
   try {
-    const updated = await dbHelper.findByIdAndUpdate(Review, 'reviews', req.params.id, updateFields);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে আপডেট করা হচ্ছে 🛠️
+    const updated = await Review.findByIdAndUpdate(
+      req.params.id, 
+      updateFields, 
+      { new: true } // এটি আপডেট হওয়া নতুন ডেটাটি রিটার্ন করবে
+    );
+    
     if (!updated) {
       return res.status(404).json({ error: 'Review not found' });
     }
     res.json(updated);
   } catch (error) {
     console.error('Update review error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'সার্ভার এরর, আপডেট করা যায়নি।' });
   }
 });
 
 // DELETE /api/reviews/:id - Delete review (Admin Only)
 router.delete('/:id', auth, admin, async (req, res) => {
   try {
-    const deleted = await dbHelper.findByIdAndDelete(Review, 'reviews', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে ডিলিট করা হচ্ছে 🗑️
+    const deleted = await Review.findByIdAndDelete(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Review not found' });
     }
     res.json({ message: 'Review deleted successfully' });
   } catch (error) {
     console.error('Delete review error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'সার্ভার এরর, ডিলিট করা যায়নি।' });
   }
 });
 
