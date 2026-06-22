@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
 
-// Vercel বা এনভায়রনমেন্ট ভেরিয়েবল চেক, না থাকলে ডিফল্ট কী ব্যবহার হবে
 const JWT_SECRET = process.env.JWT_SECRET || 'mces_jwt_secret_token_key_2026!';
 
 const auth = (req, res, next) => {
@@ -15,7 +14,7 @@ const auth = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(400).json({ error: 'Invalid token.' });
+    res.status(400).json({ error: 'Invalid token.' });
   }
 };
 
@@ -26,7 +25,6 @@ const admin = (req, res, next) => {
   next();
 };
 
-// একদম পরিষ্কারভাবে অবজেক্ট আকারে এক্সপোর্ট নিশ্চিত করা হলো
 module.exports = {
   auth,
   admin,
