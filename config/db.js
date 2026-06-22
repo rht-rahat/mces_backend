@@ -19,16 +19,24 @@ const connectDB = async () => {
   }
 };
 
-// Vercel-এ ক্র্যাশ এড়াতে local JSON DB ফাংশনগুলো মক (Mock) করে দেওয়া হলো
+// Vercel-এ ফাইল রাইটিং এরর আটকাতে এবং কোড ব্রেক না করতে মক ফাংশন
 const getDB = () => {
+  // মঙ্গোডিবি কাজ না করলে ক্র্যাশ এড়াতে জাস্ট একটি ফাঁকা স্ট্রাকচার রিটার্ন করবে
   return {
-    users: [], passports: [], packages: [], circulars: [],
-    sliders: [], reviews: [], blogs: [], notifications: [], messages: []
+    users: [],
+    passports: [],
+    packages: [],
+    circulars: [],
+    sliders: [],
+    reviews: [],
+    blogs: [],
+    notifications: [],
+    messages: []
   };
 };
 
 const saveDB = (data) => {
-  // Vercel-এ ফাইল সেভ করা বন্ধ রাখা হলো
+  // Vercel-এ ফাইল রাইট করা যাবে না, তাই ফাংশনটি ফাঁকা থাকবে
 };
 
 module.exports = {
