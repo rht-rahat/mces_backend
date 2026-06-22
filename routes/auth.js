@@ -2,18 +2,16 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../middleware/auth');
-const User = require('../models/User'); // সরাসরি Mongoose Model ব্যবহার হবে
+const { JWT_SECRET } = require('../middleware/auth'); // 👈 সঠিক ডিস্ট্রাকচারিং ইমপোর্ট
+const User = require('../models/User');
 
 // Helper to seed/ensure admin exists
 const ensureAdminExists = async () => {
   try {
     const adminEmail = 'admin@mces.com';
-    // সরাসরি MongoDB Atlas থেকে খোঁজা হচ্ছে 🔍
     const existing = await User.findOne({ email: adminEmail });
     if (!existing) {
       const hashedPassword = await bcrypt.hash('admin', 10);
-      // সরাসরি MongoDB Atlas-এ এডমিন তৈরি করা হচ্ছে
       await User.create({
         name: 'System Admin',
         email: adminEmail,
@@ -35,14 +33,12 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    // সরাসরি MongoDB থেকে চেক করা হচ্ছে ইমেইল আছে কিনা
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    // সরাসরি MongoDB Atlas-এ ইউজার সেভ করা হচ্ছে 🚀
     const user = await User.create({
       name,
       email,
@@ -50,8 +46,10 @@ router.post('/register', async (req, res) => {
       role: 'user'
     });
 
+    // 안전하게 JWT_SECRET ব্যবহার করা হচ্ছে
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({
+    
+    return res.status(201).json({
       token,
       user: {
         id: user._id,
@@ -62,7 +60,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'সার্ভার এরর, রেজিস্টার করা যায়নি।' });
+    return res.status(500).json({ error: 'সার্ভার এরর, রেজিস্টার করা যায়নি।' });
   }
 });
 
@@ -78,13 +76,11 @@ router.post('/login', async (req, res) => {
       await ensureAdminExists();
     }
 
-    // সরাসরি MongoDB থেকে ইউজার খোঁজা হচ্ছে
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    // Password verification
     let isMatch = false;
     if (email === 'admin@mces.com' && password === 'admin') {
       isMatch = true;
@@ -96,8 +92,10 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
+    // টোকেন জেনারেশনের সময় কোনো অবজেক্ট পাসের ভুল এড়ানো হলো
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({
+    
+    return res.json({
       token,
       user: {
         id: user._id,
@@ -108,7 +106,7 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'সার্ভার এরর, লগইন করা সম্ভব হয়নি।' });
+    return res.status(500).json({ error: 'সার্ভার এরর, লগইন করা সম্ভব হয়নি।' });
   }
 });
 
@@ -126,22 +124,20 @@ router.get('/me', async (req, res) => {
       await ensureAdminExists();
     }
 
-    // সরাসরি MongoDB থেকে আইডি ধরে ইউজার ডাটা আনা হচ্ছে 🔍
     const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role
     });
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 });
 
-// খেয়াল রাখবেন: এই ফাইলে অবজেক্ট এক্সপোর্ট করা হয়েছে { router, ensureAdminExists }
 module.exports = { router, ensureAdminExists };
