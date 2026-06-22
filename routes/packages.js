@@ -2,31 +2,32 @@ const express = require('express');
 const router = express.Router();
 const { auth, admin } = require('../middleware/auth');
 const { uploadSingle, handleUpload } = require('../middleware/upload');
-const Package = require('../models/Package');
-const dbHelper = require('../models/modelHelper');
+const Package = require('../models/Package'); // সরাসরি Mongoose Model ব্যবহার করা হচ্ছে
 
 // GET /api/packages - Fetch all tour packages
 router.get('/', async (req, res) => {
   try {
-    const list = await dbHelper.find(Package, 'packages', {}, { createdAt: -1 });
-    res.json(list);
+    // সরাসরি MongoDB Atlas থেকে সব প্যাকেজ লেটেস্ট অনুযায়ী সর্ট করে আনা হচ্ছে 🔍
+    const list = await Package.find({}).sort({ createdAt: -1 });
+    return res.json(list);
   } catch (error) {
     console.error('Fetch packages error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, প্যাকেজের তথ্য পাওয়া যায়নি।' });
   }
 });
 
 // GET /api/packages/:id - Fetch single tour package
 router.get('/:id', async (req, res) => {
   try {
-    const item = await dbHelper.findById(Package, 'packages', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে খোঁজা হচ্ছে
+    const item = await Package.findById(req.params.id);
     if (!item) {
       return res.status(404).json({ error: 'Tour package not found' });
     }
-    res.json(item);
+    return res.json(item);
   } catch (error) {
     console.error('Fetch package by ID error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, প্যাকেজটি পাওয়া যায়নি।' });
   }
 });
 
@@ -50,7 +51,8 @@ router.post('/', auth, admin, uploadSingle, handleUpload, async (req, res) => {
       }
     }
 
-    const packageItem = await dbHelper.create(Package, 'packages', {
+    // সরাসরি MongoDB Atlas-এ নতুন প্যাকেজ তৈরি করা হচ্ছে 🚀
+    const packageItem = await Package.create({
       title,
       destination,
       duration,
@@ -59,10 +61,11 @@ router.post('/', auth, admin, uploadSingle, handleUpload, async (req, res) => {
       imageUrl,
       itinerary: itineraryArray
     });
-    res.status(201).json(packageItem);
+    
+    return res.status(201).json(packageItem);
   } catch (error) {
     console.error('Create package error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, প্যাকেজ তৈরি করা যায়নি।' });
   }
 });
 
@@ -87,28 +90,35 @@ router.put('/:id', auth, admin, uploadSingle, handleUpload, async (req, res) => 
   }
 
   try {
-    const updated = await dbHelper.findByIdAndUpdate(Package, 'packages', req.params.id, updateFields);
+    // সরাসরি MongoDB Atlas-এ আইডি ধরে আপডেট করা হচ্ছে 🛠️
+    const updated = await Package.findByIdAndUpdate(
+      req.params.id, 
+      updateFields, 
+      { new: true }
+    );
+    
     if (!updated) {
       return res.status(404).json({ error: 'Tour package not found' });
     }
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
     console.error('Update package error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, আপডেট করা যায়নি।' });
   }
 });
 
 // DELETE /api/packages/:id - Delete tour package (Admin Only)
 router.delete('/:id', auth, admin, async (req, res) => {
   try {
-    const deleted = await dbHelper.findByIdAndDelete(Package, 'packages', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে ডিলিট করা হচ্ছে 🗑️
+    const deleted = await Package.findByIdAndDelete(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Tour package not found' });
     }
-    res.json({ message: 'Tour package deleted successfully' });
+    return res.json({ message: 'Tour package deleted successfully' });
   } catch (error) {
     console.error('Delete package error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, ডিলিট করা যায়নি।' });
   }
 });
 
