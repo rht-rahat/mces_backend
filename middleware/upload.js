@@ -3,10 +3,12 @@ const path = require('path');
 const fs = require('fs');
 const { cloudinary, isConfigured } = require('../config/cloudinary');
 
-// Ensure local uploads directory exists
+// Ensure local uploads directory exists ONLY in local development
 const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+if (process.env.NODE_ENV !== 'production') {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
 }
 
 // Memory storage for parsing file stream, or local disk storage
@@ -40,9 +42,13 @@ const handleUpload = async (req, res, next) => {
         (error, result) => {
           if (error) {
             console.error('Cloudinary stream upload error:', error);
-            // Fallback to local upload if Cloudinary service error
-            console.log('🔄 Cloudinary error! Falling back to local upload...');
-            saveLocal(fileBuffer, uniqueFilename, req, next);
+            // Fallback to local upload if Cloudinary service error (Only if not in production)
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('🔄 Cloudinary error! Falling back to local upload...');
+              saveLocal(fileBuffer, uniqueFilename, req, next);
+            } else {
+              next(new Error('Cloudinary upload failed on production.'));
+            }
           } else {
             req.fileUrl = result.secure_url;
             req.filePublicId = result.public_id;
@@ -52,8 +58,11 @@ const handleUpload = async (req, res, next) => {
       );
       uploadStream.end(fileBuffer);
     } else {
-      // Local storage fallback
-      saveLocal(fileBuffer, uniqueFilename, req, next);
+      if (process.env.NODE_ENV !== 'production') {
+        saveLocal(fileBuffer, uniqueFilename, req, next);
+      } else {
+        next(new Error('Cloudinary is not configured on production.'));
+      }
     }
   } catch (error) {
     console.error('Upload middleware error:', error);
@@ -68,7 +77,6 @@ const saveLocal = (buffer, filename, req, next) => {
       console.error('Local file write error:', err);
       return next(err);
     }
-    // Set URL relative to the backend server (e.g., http://localhost:5000/uploads/filename)
     req.fileUrl = `/uploads/${filename}`;
     next();
   });
