@@ -4,11 +4,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User'); // আপনার মঙ্গুজ মডেল
 
-// মিডেলওয়্যার থেকে JWT_SECRET ইম্পোর্ট
+// মিডেলওয়্যার থেকে JWT_SECRET ইম্পোর্ট (পাথ ঠিক করা হয়েছে)
 const authMiddleware = require('../middleware/auth-middleware');
 const JWT_SECRET = authMiddleware.JWT_SECRET;
 
-// ১. রেজিস্টার রাউট (নতুন ইউজার তৈরির জন্য)
+// ১. রেজিস্টার রাউট
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) {
@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ২. লগইন রাউট (সব ইউজারের জন্য কমন এবং সিকিউর)
+// ২. লগইন রাউট (হার্ডকোডেড কন্ডিশন রিমুভ করা হয়েছে)
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -70,14 +70,14 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ৩. অটো-অ্যাডমিন তৈরির ফাংশন (সার্ভার স্টার্ট হলে এটি কল হয়)
+// ৩. অটো-অ্যাডমিন তৈরির ফাংশন
 const ensureAdminExists = async () => {
   try {
     const adminEmail = 'admin@mces.com';
     const adminExists = await User.findOne({ email: adminEmail });
     
     if (!adminExists) {
-      const hashedPassword = await bcrypt.hash('admin', 10); // পাসওয়ার্ড 'admin'
+      const hashedPassword = await bcrypt.hash('admin', 10);
       await User.create({
         name: 'Admin',
         email: adminEmail,
