@@ -2,31 +2,32 @@ const express = require('express');
 const router = express.Router();
 const { auth, admin } = require('../middleware/auth');
 const { uploadSingle, handleUpload } = require('../middleware/upload');
-const Blog = require('../models/Blog');
-const dbHelper = require('../models/modelHelper');
+const Blog = require('../models/Blog'); // সরাসরি Mongoose মডেল
 
 // GET /api/blogs - Fetch all blogs
 router.get('/', async (req, res) => {
   try {
-    const list = await dbHelper.find(Blog, 'blogs', {}, { createdAt: -1 });
-    res.json(list);
+    // সরাসরি MongoDB Atlas থেকে লেটেস্ট ব্লগগুলো আনা হচ্ছে 🔍
+    const list = await Blog.find({}).sort({ createdAt: -1 });
+    return res.json(list);
   } catch (error) {
     console.error('Fetch blogs error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, ব্লগ পোস্টগুলো পাওয়া যায়নি।' });
   }
 });
 
 // GET /api/blogs/:id - Fetch single blog details
 router.get('/:id', async (req, res) => {
   try {
-    const blog = await dbHelper.findById(Blog, 'blogs', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে ব্লগ খোঁজা হচ্ছে
+    const blog = await Blog.findById(req.params.id);
     if (!blog) {
       return res.status(404).json({ error: 'Blog post not found' });
     }
-    res.json(blog);
+    return res.json(blog);
   } catch (error) {
     console.error('Fetch blog by ID error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, ব্লগটি পাওয়া যায়নি।' });
   }
 });
 
@@ -36,20 +37,21 @@ router.post('/', auth, admin, uploadSingle, handleUpload, async (req, res) => {
   const imageUrl = req.fileUrl;
 
   if (!title || !content || !imageUrl) {
-    return res.status(400).json({ error: 'Title, content, and blog image are required' });
+    return res.status(400).json({ error: 'Title, content, and image are required' });
   }
 
   try {
-    const blog = await dbHelper.create(Blog, 'blogs', {
+    // সরাসরি MongoDB Atlas-এ নতুন ব্লগ তৈরি 🚀
+    const blog = await Blog.create({
       title,
       content,
       imageUrl,
       author: author || 'Admin'
     });
-    res.status(201).json(blog);
+    return res.status(201).json(blog);
   } catch (error) {
     console.error('Create blog error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, ব্লগ তৈরি করা যায়নি।' });
   }
 });
 
@@ -64,28 +66,35 @@ router.put('/:id', auth, admin, uploadSingle, handleUpload, async (req, res) => 
   if (req.fileUrl) updateFields.imageUrl = req.fileUrl;
 
   try {
-    const updated = await dbHelper.findByIdAndUpdate(Blog, 'blogs', req.params.id, updateFields);
+    // সরাসরি MongoDB Atlas-এ আইডি ধরে আপডেট 🛠️
+    const updated = await Blog.findByIdAndUpdate(
+      req.params.id, 
+      updateFields, 
+      { new: true }
+    );
+    
     if (!updated) {
       return res.status(404).json({ error: 'Blog post not found' });
     }
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
     console.error('Update blog error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, আপডেট করা যায়নি।' });
   }
 });
 
 // DELETE /api/blogs/:id - Delete blog post (Admin Only)
 router.delete('/:id', auth, admin, async (req, res) => {
   try {
-    const deleted = await dbHelper.findByIdAndDelete(Blog, 'blogs', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে ডিলিট 🗑️
+    const deleted = await Blog.findByIdAndDelete(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Blog post not found' });
     }
-    res.json({ message: 'Blog post deleted successfully' });
+    return res.json({ message: 'Blog post deleted successfully' });
   } catch (error) {
     console.error('Delete blog error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, ডিলিট করা যায়নি।' });
   }
 });
 

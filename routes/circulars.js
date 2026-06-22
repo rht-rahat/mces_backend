@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { auth, admin } = require('../middleware/auth');
 const { uploadSingle, handleUpload } = require('../middleware/upload');
-const Circular = require('../models/Circular');
-const dbHelper = require('../models/modelHelper');
+const Circular = require('../models/Circular'); // সরাসরি Mongoose Model ব্যবহার
 
 // GET /api/circulars - Fetch all circulars with dynamic filter support
 router.get('/', async (req, res) => {
@@ -14,25 +13,27 @@ router.get('/', async (req, res) => {
   if (jobCategory) filter.jobCategory = jobCategory;
 
   try {
-    const list = await dbHelper.find(Circular, 'circulars', filter, { createdAt: -1 });
-    res.json(list);
+    // সরাসরি MongoDB Atlas থেকে ফিল্টার অনুযায়ী ডেটা আনা হচ্ছে 🔍
+    const list = await Circular.find(filter).sort({ createdAt: -1 });
+    return res.json(list);
   } catch (error) {
     console.error('Fetch circulars error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, নিয়োগ বিজ্ঞপ্তি পাওয়া যায়নি।' });
   }
 });
 
 // GET /api/circulars/:id - Fetch single circular
 router.get('/:id', async (req, res) => {
   try {
-    const item = await dbHelper.findById(Circular, 'circulars', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে আইডি ধরে খোঁজা হচ্ছে
+    const item = await Circular.findById(req.params.id);
     if (!item) {
       return res.status(404).json({ error: 'Circular not found' });
     }
-    res.json(item);
+    return res.json(item);
   } catch (error) {
     console.error('Fetch circular by ID error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, বিজ্ঞপ্তিটি পাওয়া যায়নি।' });
   }
 });
 
@@ -46,27 +47,30 @@ router.post('/', auth, admin, uploadSingle, handleUpload, async (req, res) => {
   }
 
   try {
-    let requirementsArray = [];
+    // Requirements পার্সিং
+    let reqArray = [];
     if (requirements) {
       try {
-        requirementsArray = typeof requirements === 'string' ? JSON.parse(requirements) : requirements;
+        reqArray = typeof requirements === 'string' ? JSON.parse(requirements) : requirements;
       } catch (e) {
-        requirementsArray = requirements.split('\n').filter(Boolean);
+        reqArray = requirements.split('\n').filter(Boolean);
       }
     }
 
-    const circular = await dbHelper.create(Circular, 'circulars', {
+    // সরাসরি MongoDB Atlas-এ নতুন বিজ্ঞপ্তি তৈরি 🚀
+    const circular = await Circular.create({
       title,
       country,
       jobCategory,
       salaryRange,
-      requirements: requirementsArray,
-      imageUrl
+      imageUrl,
+      requirements: reqArray
     });
-    res.status(201).json(circular);
+    
+    return res.status(201).json(circular);
   } catch (error) {
     console.error('Create circular error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, বিজ্ঞপ্তি তৈরি করা যায়নি।' });
   }
 });
 
@@ -90,28 +94,35 @@ router.put('/:id', auth, admin, uploadSingle, handleUpload, async (req, res) => 
   }
 
   try {
-    const updated = await dbHelper.findByIdAndUpdate(Circular, 'circulars', req.params.id, updateFields);
+    // সরাসরি MongoDB Atlas-এ আইডি ধরে আপডেট 🛠️
+    const updated = await Circular.findByIdAndUpdate(
+      req.params.id, 
+      updateFields, 
+      { new: true }
+    );
+    
     if (!updated) {
       return res.status(404).json({ error: 'Circular not found' });
     }
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
     console.error('Update circular error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, আপডেট করা যায়নি।' });
   }
 });
 
 // DELETE /api/circulars/:id - Delete circular (Admin Only)
 router.delete('/:id', auth, admin, async (req, res) => {
   try {
-    const deleted = await dbHelper.findByIdAndDelete(Circular, 'circulars', req.params.id);
+    // সরাসরি MongoDB Atlas থেকে ডিলিট 🗑️
+    const deleted = await Circular.findByIdAndDelete(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Circular not found' });
     }
-    res.json({ message: 'Circular deleted successfully' });
+    return res.json({ message: 'Circular deleted successfully' });
   } catch (error) {
     console.error('Delete circular error:', error);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'সার্ভার এরর, ডিলিট করা যায়নি।' });
   }
 });
 
