@@ -3,7 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const { connectDB } = require("./config/db");
 const { ensureAdminExists } = require("./routes/auth");
-const dbHelper = require("./models/modelHelper");
 
 // Models for seeding
 const Package = require("./models/Package");
