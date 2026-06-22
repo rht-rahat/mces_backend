@@ -4,6 +4,7 @@
   "description": "Backend server for MCES Platform",
   "main": "server.js",
   "scripts": {
+    "build": "echo 'No compilation step required for Node.js Express.'",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },

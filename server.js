@@ -5,7 +5,7 @@ const { connectDB } = require("./config/db");
 const { ensureAdminExists } = require("./routes/auth");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({ origin: true, credentials: true }));
@@ -71,13 +71,17 @@ connectDB()
   .then(() => {
     console.log("Database connected successfully");
     ensureAdminExists().catch(err => console.error("Admin check failed:", err));
-    // Vercel-এর জন্য app.listen প্রয়োজন নেই, কিন্তু লোকাল ডেভেলপমেন্টের জন্য এটি রাখা হলো
-    if (process.env.NODE_ENV !== 'production') {
+    
+    // Vercel Serverless Function-এর ক্ষেত্রে app.listen করার রেস্ট্রিকশন আছে,
+    // কিন্তু লোকাল বা কন্টেইনারাইজড এনভায়রনমেন্টে লিসেনার রান করতে হবে।
+    if (!process.env.VERCEL) {
       app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    } else {
+      console.log("Vercel Serverless environment detected. Handling routes asynchronously.");
     }
   })
   .catch(err => {
-    console.error("Database connection failed:", err);
+    console.error("Database connection failed during boot:", err);
     process.exit(1);
   });
 

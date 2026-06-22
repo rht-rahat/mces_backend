@@ -1,0 +1,6 @@
+{
+  "name": "MCES Travel",
+  "description": "MCES International Overseas Travel Agency & Passport Tracking System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
