@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // আপনার মঙ্গুজ মডেল
+const User = require('../models/User');
 
-// মিডেলওয়্যার থেকে JWT_SECRET ইম্পোর্ট (পাথ ঠিক করা হয়েছে)
-const authMiddleware = require('../middleware/auth-middleware');
+// Corrected path to the middleware file
+const authMiddleware = require('../middleware/auth');
 const JWT_SECRET = authMiddleware.JWT_SECRET;
 
-// ১. রেজিস্টার রাউট
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) {
@@ -33,15 +33,20 @@ router.post('/register', async (req, res) => {
     
     return res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
   } catch (error) {
     console.error('Register error:', error);
-    return res.status(500).json({ error: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে।' });
+    return res.status(500).json({ error: 'সার্ভার এরর, রেজিস্টার করা যায়নি।' });
   }
 });
 
-// ২. লগইন রাউট (হার্ডকোডেড কন্ডিশন রিমুভ করা হয়েছে)
+// POST /api/auth/login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -49,6 +54,7 @@ router.post('/login', async (req, res) => {
   }
 
   try {
+    // Regular login process
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
@@ -62,36 +68,21 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
+
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ error: 'লগইন ব্যর্থ হয়েছে।' });
+    return res.status(500).json({ error: 'সার্ভার এরর, লগইন করা সম্ভব হয়নি।' });
   }
 });
 
-// ৩. অটো-অ্যাডমিন তৈরির ফাংশন
-const ensureAdminExists = async () => {
-  try {
-    const adminEmail = 'admin@mces.com';
-    const adminExists = await User.findOne({ email: adminEmail });
-    
-    if (!adminExists) {
-      const hashedPassword = await bcrypt.hash('admin', 10);
-      await User.create({
-        name: 'Admin',
-        email: adminEmail,
-        password: hashedPassword,
-        role: 'admin'
-      });
-      console.log('Admin account created successfully.');
-    }
-  } catch (error) {
-    console.error('Error in ensureAdminExists:', error);
-  }
-};
-
-// ৪. বর্তমান ইউজারের তথ্য পাওয়ার রাউট
+// GET /api/auth/me
 router.get('/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -101,12 +92,23 @@ router.get('/me', async (req, res) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    return res.json(user);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    });
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 });
 
-module.exports = { router, ensureAdminExists };
+module.exports = { 
+  router, 
+  ensureAdminExists: async () => {} 
+};
