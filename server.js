@@ -4,90 +4,37 @@ const cors = require("cors");
 const { connectDB } = require("./config/db");
 const { ensureAdminExists } = require("./routes/auth");
 
-// Models for seeding
-const Package = require("./models/Package");
-const Circular = require("./models/Circular");
-const Slider = require("./models/Slider");
-const Review = require("./models/Review");
-const Blog = require("./models/Blog");
-const Appointment = require("./models/Appointment");
-const galleryRoute = require("./routes/gallery");
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(
-  cors({
-    origin: true, 
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  }),
-);
-
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-const authRoute = require("./routes/auth").router;
-const verifyToken = require("./routes/auth").verifyToken || ((req, res, next) => next());
-
-const passportsRoute = require("./routes/passports");
-const packagesRoute = require("./routes/packages");
-const circularsRoute = require("./routes/circulars");
-const slidersRoute = require("./routes/sliders");
-const reviewsRoute = require("./routes/reviews");
-const blogsRoute = require("./routes/blogs");
-const notificationsRoute = require("./routes/notifications").router;
-const messagesRoute = require("./routes/messages");
-const contactRoute = require("./routes/contact");
+// auth.js থেকে router এবং verifyToken ইম্পোর্ট করা হচ্ছে
+const authModule = require("./routes/auth");
+const authRoute = authModule.router;
+const verifyToken = authModule.verifyToken || ((req, res, next) => next());
 
 app.use("/api/auth", authRoute);
-app.use("/api/passports", passportsRoute);
-app.use("/api/packages", packagesRoute);
-app.use("/api/circulars", circularsRoute);
-app.use("/api/sliders", slidersRoute);
-app.use("/api/reviews", reviewsRoute);
-app.use("/api/gallery", galleryRoute);
-app.use("/api/blogs", blogsRoute);
-app.use("/api/notifications", notificationsRoute);
-app.use("/api/messages", messagesRoute);
-app.use("/api/contact", contactRoute);
+app.use("/api/passports", require("./routes/passports"));
+app.use("/api/packages", require("./routes/packages"));
+app.use("/api/circulars", require("./routes/circulars"));
+app.use("/api/sliders", require("./routes/sliders"));
+app.use("/api/reviews", require("./routes/reviews"));
+app.use("/api/blogs", require("./routes/blogs"));
+app.use("/api/notifications", require("./routes/notifications").router);
+app.use("/api/messages", require("./routes/messages"));
+app.use("/api/contact", require("./routes/contact"));
+app.use("/api/gallery", require("./routes/gallery"));
 
-// ১. অ্যাপয়েন্টমেন্ট বুকিং রাউট (POST)
-app.post("/api/appointments", async (req, res) => {
-  try {
-    const { name, email, phone, message, serviceName, date } = req.body;
-
-    if (!name || !phone || !serviceName || !date) {
-      return res.status(400).json({ message: "প্রয়োজনীয় ফিল্ডগুলো পূরণ করুন।" });
-    }
-
-    const newAppointment = new Appointment({
-      name,
-      email,
-      phone,
-      message,
-      serviceName,
-      date,
-      status: "pending",
-    });
-
-    await newAppointment.save();
-    res.status(201).json({
-      message: "অ্যাপয়েন্টমেন্ট সফলভাবে বুকিং করা হয়েছে!",
-      data: newAppointment,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "সার্ভার সমস্যা, আবার চেষ্টা করুন।" });
-  }
-});
-
-// ২. অ্যাপয়েন্টমেন্টের স্ট্যাটাস আপডেট করার রাউট (PUT)
+// অ্যাপয়েন্টমেন্ট স্ট্যাটাস রাউট
 app.put("/api/appointments/:id/status", verifyToken, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+  const Appointment = require("./models/Appointment");
 
   if (!["accepted", "rejected"].includes(status)) {
     return res.status(400).json({ message: "ভুল স্ট্যাটাস দেওয়া হয়েছে।" });
@@ -97,7 +44,7 @@ app.put("/api/appointments/:id/status", verifyToken, async (req, res) => {
     const updatedAppointment = await Appointment.findByIdAndUpdate(
       id,
       { status: status },
-      { new: true },
+      { new: true }
     );
 
     if (!updatedAppointment) {
@@ -109,6 +56,7 @@ app.put("/api/appointments/:id/status", verifyToken, async (req, res) => {
       data: updatedAppointment,
     });
   } catch (err) {
+    console.error("Appointment update error:", err);
     res.status(500).json({ message: "সার্ভার এরর।" });
   }
 });
@@ -118,22 +66,20 @@ app.get("/", (req, res) => {
   res.send("MCES Platform Backend API is running...");
 });
 
-// Vercel / Serverless-friendly Database Connection
+// Database Connection & Server
 connectDB()
   .then(() => {
     console.log("Database connected successfully");
     ensureAdminExists().catch(err => console.error("Admin check failed:", err));
+    // Vercel-এর জন্য app.listen প্রয়োজন নেই, কিন্তু লোকাল ডেভেলপমেন্টের জন্য এটি রাখা হলো
+    if (process.env.NODE_ENV !== 'production') {
+      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    }
   })
   .catch(err => {
     console.error("Database connection failed:", err);
+    process.exit(1);
   });
 
-// Local localhost server fallback
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-  });
-}
-
-// Export for Vercel
+// Vercel-এর জন্য এক্সপোর্ট
 module.exports = app;
