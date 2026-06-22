@@ -2,21 +2,18 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // সরাসরি Mongoose Model ব্যবহার করা হচ্ছে
-
-// Named Export-এর ক্র্যাশ এড়াতে CommonJS অবজেক্ট থেকে সেফ ইম্পোর্ট 🛠️
-const authMiddleware = require('../middleware/auth');
-const JWT_SECRET = authMiddleware.JWT_SECRET;
+const { JWT_SECRET } = require('../middleware/auth');
+const User = require('../models/User');
+const dbHelper = require('../models/modelHelper');
 
 // Helper to seed/ensure admin exists
 const ensureAdminExists = async () => {
   try {
     const adminEmail = 'admin@mces.com';
-    // সরাসরি MongoDB Atlas থেকে খোঁজা হচ্ছে
-    const existing = await User.findOne({ email: adminEmail });
+    const existing = await dbHelper.findOne(User, 'users', { email: adminEmail });
     if (!existing) {
       const hashedPassword = await bcrypt.hash('admin', 10);
-      await User.create({
+      await dbHelper.create(User, 'users', {
         name: 'System Admin',
         email: adminEmail,
         password: hashedPassword,
@@ -37,25 +34,24 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const existing = await User.findOne({ email });
+    const existing = await dbHelper.findOne(User, 'users', { email });
     if (existing) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
+    const user = await dbHelper.create(User, 'users', {
       name,
       email,
       password: hashedPassword,
       role: 'user'
     });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    
-    return res.status(201).json({
+    const token = jwt.sign({ id: user._id || user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({
       token,
       user: {
-        id: user._id,
+        id: user._id || user.id,
         name: user.name,
         email: user.email,
         role: user.role
@@ -63,7 +59,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
-    return res.status(500).json({ error: 'সার্ভার এরর, রেজিস্টার করা যায়নি।' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -75,55 +71,42 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // ১. এডমিন লগইনের জন্য সরাসরি হার্ডকোডেড কন্ডিশন চেক (Bcrypt ক্র্যাশ ও ডাটাবেস এরর এড়াতে)
-    if (email === 'admin@mces.com' && password === 'admin') {
-      let adminUser = await User.findOne({ email: 'admin@mces.com' });
-      
-      if (!adminUser) {
-        await ensureAdminExists();
-        adminUser = await User.findOne({ email: 'admin@mces.com' });
-      }
-      
-      if (adminUser) {
-        const token = jwt.sign({ id: adminUser._id, role: adminUser.role }, JWT_SECRET, { expiresIn: '7d' });
-        return res.json({
-          token,
-          user: {
-            id: adminUser._id,
-            name: adminUser.name,
-            email: adminUser.email,
-            role: adminUser.role
-          }
-        });
-      }
+    // Make sure admin is seeded if it's an admin login attempt
+    if (email === 'admin@mces.com') {
+      await ensureAdminExists();
     }
 
-    // ২. সাধারণ ইউজারদের জন্য রেগুলার লগইন প্রসেস
-    const user = await User.findOne({ email });
+    const user = await dbHelper.findOne(User, 'users', { email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    // পাসওয়ার্ড ভেরিফিকেশন
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Handle password verification
+    let isMatch = false;
+    // Bypassing bcrypt if user tries admin credentials directly (or standard bcrypt match)
+    if (email === 'admin@mces.com' && password === 'admin') {
+      isMatch = true;
+    } else {
+      isMatch = await bcrypt.compare(password, user.password);
+    }
+
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({
+    const token = jwt.sign({ id: user._id || user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
       token,
       user: {
-        id: user._id,
+        id: user._id || user.id,
         name: user.name,
         email: user.email,
         role: user.role
       }
     });
-
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ error: 'সার্ভার এরর, লগইন করা সম্ভব হয়নি।' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -137,23 +120,24 @@ router.get('/me', async (req, res) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    // Seed admin if it's admin's token
     if (decoded.role === 'admin') {
       await ensureAdminExists();
     }
 
-    const user = await User.findById(decoded.id);
+    const user = await dbHelper.findById(User, 'users', decoded.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json({
-      id: user._id,
+    res.json({
+      id: user._id || user.id,
       name: user.name,
       email: user.email,
       role: user.role
     });
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
