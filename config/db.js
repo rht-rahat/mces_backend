@@ -1,24 +1,6 @@
 const mongoose = require('mongoose');
-const fs = require('fs');
-const path = require('path');
 
 let isConnected = false;
-const dbFilePath = path.join(__dirname, '../db.json');
-
-// Initialize local JSON DB if it doesn't exist
-if (!fs.existsSync(dbFilePath)) {
-  fs.writeFileSync(dbFilePath, JSON.stringify({
-    users: [],
-    passports: [],
-    packages: [],
-    circulars: [],
-    sliders: [],
-    reviews: [],
-    blogs: [],
-    notifications: [],
-    messages: []
-  }, null, 2));
-}
 
 const connectDB = async () => {
   try {
@@ -34,34 +16,19 @@ const connectDB = async () => {
   } catch (err) {
     isConnected = false;
     console.log('⚠️ MongoDB Connection Failed or URI not provided.');
-    console.log('🔄 Running in LOCAL JSON DATABASE FALLBACK mode!');
   }
 };
 
+// Vercel-এ ক্র্যাশ এড়াতে local JSON DB ফাংশনগুলো মক (Mock) করে দেওয়া হলো
 const getDB = () => {
-  try {
-    const data = fs.readFileSync(dbFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading local DB file, resetting...', error);
-    const initialData = {
-      users: [],
-      passports: [],
-      packages: [],
-      circulars: [],
-      sliders: [],
-      reviews: [],
-      blogs: [],
-      notifications: [],
-      messages: []
-    };
-    fs.writeFileSync(dbFilePath, JSON.stringify(initialData, null, 2));
-    return initialData;
-  }
+  return {
+    users: [], passports: [], packages: [], circulars: [],
+    sliders: [], reviews: [], blogs: [], notifications: [], messages: []
+  };
 };
 
 const saveDB = (data) => {
-  fs.writeFileSync(dbFilePath, JSON.stringify(data, null, 2));
+  // Vercel-এ ফাইল সেভ করা বন্ধ রাখা হলো
 };
 
 module.exports = {
